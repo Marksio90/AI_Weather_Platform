@@ -1,19 +1,22 @@
 from __future__ import annotations
 
-import streamlit as st
-import pandas as pd
 import logging
+from typing import Tuple
+
+import pandas as pd
+import streamlit as st
 
 # === CORE / CONFIG ===
 try:
     from core.config import CONFIG
-except Exception:  # awaryjnie, żeby się dało uruchomić
+except Exception:  # awaryjnie, żeby się dało uruchomić nawet bez core/config
     class _FallbackConfig:
         app_name = "AI Weather Platform"
         default_lat = 52.2297
         default_lon = 21.0122
         default_lang = "pl"
         default_timezone = "auto"
+
     CONFIG = _FallbackConfig()
 
 from core.logging_config import setup_logging
@@ -45,6 +48,10 @@ from ai.tts import synthesize_speech_to_bytes
 from ai.model_slot import apply_model_slot
 
 
+APP_VERSION = "v0.7+"
+DEFAULT_FORECAST_DAYS = 7
+
+
 # ---------------------------
 # CACHING / HELPERS
 # ---------------------------
@@ -57,10 +64,7 @@ def cached_forecast(
     days: int,
     source: str,
 ) -> pd.DataFrame | None:
-    """
-    Proste cachowanie prognozy – żeby przy zmianie UI nie walić co chwilę w API.
-    Klucz: wszystkie argumenty.
-    """
+    """Proste cachowanie prognozy – żeby przy zmianie UI nie walić co chwilę w API."""
     return get_hourly_dataframe(
         lat=lat,
         lon=lon,
@@ -70,32 +74,32 @@ def cached_forecast(
     )
 
 
-def _select_location_from_search(city_query: str, lang: str):
+def _select_location_from_search(city_query: str, lang: str) -> Tuple[str | None, float, float]:
     """
     Obsługuje scenariusz: user wpisał miasto → pobierz listę → pozwól wybrać.
-    Zwraca (name, lat, lon) albo (None, default lat/lon)
+    Zwraca (name, lat, lon) albo (None, default_lat, default_lon) gdy brak wyników.
     """
     locations = []
     if city_query:
         locations = search_locations(city_query, language=lang)
 
     if locations:
-        options_labels = [format_location_option(loc) for loc in locations]
+        labels = [format_location_option(loc) for loc in locations]
         chosen_idx = st.selectbox(
             "Wybierz lokalizację z wyników",
-            options=list(range(len(options_labels))),
-            format_func=lambda i: options_labels[i],
+            options=list(range(len(labels))),
+            format_func=lambda i: labels[i],
             index=0,
         )
-        chosen_location = locations[chosen_idx]
+        chosen = locations[chosen_idx]
         st.success(
-            f"Wybrano: {chosen_location['name']} "
-            f"({chosen_location['latitude']:.2f}, {chosen_location['longitude']:.2f})"
+            f"Wybrano: {chosen['name']} "
+            f"({chosen['latitude']:.2f}, {chosen['longitude']:.2f})"
         )
         return (
-            chosen_location["name"],
-            float(chosen_location["latitude"]),
-            float(chosen_location["longitude"]),
+            chosen["name"],
+            float(chosen["latitude"]),
+            float(chosen["longitude"]),
         )
 
     # brak wyników – ręczne współrzędne
@@ -149,11 +153,11 @@ def main() -> None:
         help="Slot na prawdziwy model (GraphCast / HF). Teraz makiety.",
     )
 
-    # ============ HEADER + PANEL UŻYTKOWNIKA ============
+    # ============ HEADER + PANEL ============
     render_header(lang)
     render_business_panel(user)
 
-    # ============ LOCATION INPUT ============
+    # ============ LOCATION ============
     city_query = render_location_search(lang)
     selected_city_name, selected_lat, selected_lon = _select_location_from_search(city_query, lang)
 
@@ -164,19 +168,19 @@ def main() -> None:
             lat=selected_lat,
             lon=selected_lon,
             timezone=CONFIG.default_timezone,
-            days=7,
+            days=DEFAULT_FORECAST_DAYS,
             source=real_source,
         )
     except Exception as exc:
         log.exception("Błąd przy pobieraniu prognozy: %s", exc)
         df = None
 
-    if df is None:
+    if df is None or df.empty:
         st.error(t("error_fetch", lang))
         st.stop()
 
     # ============ AI MODEL SLOT ============
-    df_model, model_notes = apply_model_slot(
+    df_after_slot, model_notes = apply_model_slot(
         df,
         slot_name=model_slot_name,
         lat=selected_lat,
@@ -185,11 +189,10 @@ def main() -> None:
 
     # ============ AI POSTPROCESS ============
     if use_ai:
-        df_ai, ai_notes = apply_basic_ai_corrections(df_model)
+        df_ai, ai_notes = apply_basic_ai_corrections(df_after_slot)
     else:
-        df_ai, ai_notes = df_model, []
+        df_ai, ai_notes = df_after_slot, []
 
-    # scal notatki
     all_notes = list(model_notes) + list(ai_notes)
 
     # ============ VISUALS ============
@@ -199,11 +202,12 @@ def main() -> None:
 
     # ============ TTS / TEXT ============
     if show_voice:
-        st.subheader("🗣️ " + t("voice.title", lang) if t("voice.title", lang) else "🗣️ Tekst prognozy")
+        voice_title = t("voice.title", lang) or "Tekst prognozy"
+        st.subheader("🗣️ " + voice_title)
         forecast_text = build_text_forecast(df_ai, lang=lang, city_name=selected_city_name)
         st.text_area("Tekst do przeczytania", forecast_text, height=160)
 
-        if enable_tts:
+        if enable_tts and forecast_text.strip():
             if check_feature_access(user, "tts"):
                 if st.button("🔊 Wygeneruj i odtwórz prognozę"):
                     audio_bytes = synthesize_speech_to_bytes(forecast_text, lang=lang)
@@ -227,9 +231,10 @@ def main() -> None:
     if dev_mode or check_feature_access(user, "verification"):
         render_verification_panel(df_ai)
 
+    # ============ FOOTER ============
     st.caption(f"{t('last_update', lang)} {df.index.max()}")
     st.markdown("---")
-    st.caption("v0.7+ • modular, cached, AI-slot-first")
+    st.caption(f"{APP_VERSION} • modular, cached, AI-slot-first")
 
 
 if __name__ == "__main__":
