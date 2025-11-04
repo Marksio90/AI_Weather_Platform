@@ -1,7 +1,18 @@
 [theme]
+# tryb ogólny
 base = "dark"
+
+# kolor akcentu – zostawiamy Twój cyan, bo świetnie pasuje do “weather/AI”
 primaryColor = "#38bdf8"
+
+# tło główne – prawie czarne, ale nie zupełnie, żeby nie było efektu “dziury”
 backgroundColor = "#020617"
+
+# tło elementów (karty, boczny panel) – trochę jaśniejsze, żeby karty się odcinały
 secondaryBackgroundColor = "#0f172a"
+
+# kolor tekstu – jasny, ale nie 100% biały (mniej męczy)
 textColor = "#e2e8f0"
+
+# font – bezszeryfowy
 font = "sans serif"
