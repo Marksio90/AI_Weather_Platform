@@ -1,19 +1,64 @@
 from __future__ import annotations
-from dataclasses import dataclass
-import os
+from typing import Optional
+from io import BytesIO
+import logging
 
-@dataclass(frozen=True)
-class AppConfig:
-    app_name: str = "AI Weather Platform"
-    default_lat: float = 52.2297
-    default_lon: float = 21.0122
-    default_lang: str = "pl"
-    default_timezone: str = "auto"
+from gtts import gTTS
 
-    @staticmethod
-    def from_env() -> "AppConfig":
-        return AppConfig(
-            default_lang=os.getenv("APP_DEFAULT_LANG", "pl"),
-        )
+logger = logging.getLogger(__name__)
 
-CONFIG = AppConfig.from_env()
+# gTTS nie lubi absurdalnie długich stringów – dobrze mieć bezpieczny limit
+DEFAULT_MAX_CHARS = 5000
+
+
+def _pick_lang_code(ui_lang: str) -> str:
+    """
+    Mapowanie języka z UI na kod gTTS.
+    Jak chcesz więcej języków – dopisz je tutaj.
+    """
+    mapping = {
+        "pl": "pl",
+        "en": "en",
+        "en-US": "en",
+        "en-GB": "en",
+    }
+    return mapping.get(ui_lang, "en")
+
+
+def synthesize_speech_to_bytes(
+    text: str,
+    lang: str = "pl",
+    *,
+    max_chars: int = DEFAULT_MAX_CHARS,
+    slow: bool = False,
+    tld: str = "com",
+) -> Optional[bytes]:
+    """
+    Generuje MP3 w pamięci z użyciem gTTS.
+
+    - przycina tekst jeśli jest za długi (żeby gTTS nie padło),
+    - dobiera kod języka na podstawie języka UI,
+    - umożliwia ustawienie wolniejszego czytania,
+    - w razie błędu zwraca None (UI może wtedy pokazać komunikat).
+
+    Uwaga: wymaga internetu w środowisku uruchomienia.
+    """
+    if not text or not text.strip():
+        return None
+
+    safe_text = text.strip()
+    if len(safe_text) > max_chars:
+        safe_text = safe_text[:max_chars] + "..."
+
+    lang_code = _pick_lang_code(lang)
+
+    try:
+        tts = gTTS(text=safe_text, lang=lang_code, slow=slow, tld=tld)
+        buf = BytesIO()
+        tts.write_to_fp(buf)
+        buf.seek(0)
+        return buf.read()
+    except Exception as exc:
+        # teraz przynajmniej w logach zobaczysz, dlaczego się wysypało
+        logger.exception("TTS generation failed: %s", exc)
+        return None
