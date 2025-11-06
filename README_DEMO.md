@@ -1,27 +1,18 @@
-# 🌦 AI Weather Platform – DEMO
+# 🌦 AI Weather Platform – Demo Edition
 
-To jest **lekka wersja demo** zbudowana na bazie Twojej paczki.
+> **Jednoplikowa wersja pokazowa** inteligentnej platformy pogodowej opartej o dane Open-Meteo i AI-asystenta interpretującego prognozy.  
+> Zbudowana w 100% w **Python + Streamlit**, gotowa do deployu i rozwoju jako część ekosystemu **DataGenius PRO / Weather AI**.
 
-## Co robi
+---
 
-- wyszukuje lokalizację przez `ingestion.open_meteo_client.search_locations`
-- pobiera prognozę z `weather.services.fetch_weather_df`
-- pokazuje temperaturę i opad w Streamlicie
-- pozwala wybrać liczbę dni prognozy
+## 🚀 Funkcjonalności
 
-## Jak uruchomić
-
-1. Rozpakuj *oryginalną* paczkę (tę, którą mi wysłałeś) i w tym samym katalogu zapisz plik `demo_app.py` z tego archiwum.
-2. Zainstaluj wymagania (takie jak w Twojej paczce), np.:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Odpal demo:
-
-   ```bash
-   streamlit run demo_app.py
-   ```
-
-Jeśli moduły nie zostaną znalezione – upewnij się, że katalogi `ingestion/` oraz `weather/` znajdują się **obok** pliku `demo_app.py`.
+✅ Wyszukiwanie lokalizacji (API Open-Meteo)  
+✅ Pobieranie i wizualizacja prognozy godzinowej  
+✅ Automatyczna analiza warunków i alerty pogodowe  
+✅ Agregacja dzienna (min/max temp, suma opadów)  
+✅ Dynamiczne KPI z temperaturą, wilgotnością i opadami  
+✅ Mapka z położeniem lokalizacji  
+✅ Inteligentne komentarze pogodowe („AI hinty”)  
+✅ Działa w 1 pliku – bez zależności zewnętrznych  
+✅ Gotowe pod rozbudowę o własne moduły (`ingestion/`, `weather/`)  
